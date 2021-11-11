@@ -20,6 +20,9 @@ Header = 129..255   (257 - n) repeated bytes
 Header = 128        No operation
 
 https://en.wikipedia.org/wiki/PackBits
+
+Source on GitHub:
+https://github.com/skirridsystems/packbits
 ******************************************************************************/
 
 #include <stdint.h>
