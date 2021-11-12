@@ -160,20 +160,32 @@ It is not possible to predict the unpack size, although it may well be known.
 Both source and destination buffer sizes are given and unpacking stops when
 either the source runs out or the destination is full.
 Return value is the unpacked size.
+
+If the destination becomes full part way through a run, return value is 0.
+
+As a special case, if the source size is specified as 0, as much source will
+be used as is required to fill the destination, and the number of source
+bytes used will be returned. This can be used to unpack a buffer in chunks,
+but it relies on the unpacking chunk size being a multiple of the packing
+chunk size so that chunk boundaries are not crossed when unpacking.
+
 Unpacking is a lot simpler than packing.
 ----------------------------------------------------------------------------*/
 uint16_t unpackbits(const uint8_t *srcPtr, uint8_t *destPtr, uint16_t srcCount, uint16_t destLimit)
 {
     uint8_t hdr;                    // Header byte indicating run length and type
     uint8_t count;                  // Run length derived from header
+    uint16_t srcRemaining;          // Number of bytes of source left to unpack
     uint16_t destRemaining;         // Buffer size still available for unpacking into
+    const int srcLimit = 0xffff;    // Used for unpacking a fixed destination size
     
+    srcRemaining = srcCount ? srcCount : srcLimit;
     destRemaining = destLimit;
-    while ((srcCount != 0) && (destRemaining != 0))
+    while ((srcRemaining != 0) && (destRemaining != 0))
     {
         // Read header byte
         hdr = *srcPtr++;
-        --srcCount;
+        --srcRemaining;
         if (IS_DIFF(hdr))
         {
             // This is a run of differing bytes
@@ -183,16 +195,16 @@ uint16_t unpackbits(const uint8_t *srcPtr, uint8_t *destPtr, uint16_t srcCount, 
             {
                 count = destRemaining;
             }
-            if (count > srcCount)
+            if (count > srcRemaining)
             {
-                count = srcCount;
+                count = srcRemaining;
             }
             if (count != 0)
             {
                 // Copy the differing byte run
                 memcpy(destPtr, srcPtr, count);
                 srcPtr += count;
-                srcCount -= count;
+                srcRemaining -= count;
                 destPtr += count;
                 destRemaining -= count;
             }
@@ -206,16 +218,23 @@ uint16_t unpackbits(const uint8_t *srcPtr, uint8_t *destPtr, uint16_t srcCount, 
             {
                 count = destRemaining;
             }
-            if ((count != 0) && (srcCount != 0))
+            if ((count != 0) && (srcRemaining != 0))
             {
                 // Copy the repeated byte run
                 memset(destPtr, *srcPtr, count);
                 srcPtr++;
-                srcCount--;
+                srcRemaining--;
                 destPtr += count;
                 destRemaining -= count;
             }
         }
     }
-    return destLimit - destRemaining;   // Number of bytes actually output
+    if (srcCount == 0)
+    {
+        return srcLimit - srcRemaining;     // Number of soure bytes used
+    }
+    else
+    {
+        return destLimit - destRemaining;   // Number of bytes actually output
+    }
 }
