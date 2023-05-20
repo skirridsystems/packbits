@@ -25,7 +25,6 @@ Source on GitHub:
 https://github.com/skirridsystems/packbits
 ******************************************************************************/
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
 #include "packbits.h"
@@ -237,4 +236,112 @@ uint16_t unpackbits(const uint8_t *srcPtr, uint8_t *destPtr, uint16_t srcCount, 
     {
         return destLimit - destRemaining;   // Number of bytes actually output
     }
+}
+
+/*----------------------------------------------------------------------------
+unpackbits_window for severely memory-constrained embedded applications.
+It allows decompression of only a specified window of output bytes, which can help to minimize memory usage by only requiring an output array of the size of data to be extracted.
+
+Example:
+You have an array containing compressed data in FLASH, the decompressed size would be 1024 bytes.
+You only have 2k of RAM and you only need to extract bytes 512 to 520.
+Instead of wasting 1024 bytes of RAM by extracting everything you now have the option to only extract the 8 you need.
+destStartByte would be 512, destLimit is the size of the output array, so 8.
+
+As there are no "sectors" in the compressed data, all bytes before the ones you need will still need to be decompressed, but at least they can be discarded.
+
+always returns the number of bytes unpacked.
+----------------------------------------------------------------------------*/
+uint16_t unpackbits_window(const uint8_t *srcPtr, uint8_t *destPtr, uint16_t srcCount, uint16_t destStartByte, uint16_t destLimit)
+{
+    uint8_t hdr;                    // Header byte indicating run length and type
+    uint8_t count;                  // Run length derived from header
+    uint16_t srcRemaining;          // Number of bytes of source left to unpack
+    uint16_t destRemaining;         // Buffer size still available for unpacking into
+    uint16_t destPos = 0;           // Keep track of the current position in the output data
+    const int srcLimit = 0xffff;    // Used for unpacking a fixed destination size
+    
+    srcRemaining = srcCount ? srcCount : srcLimit;
+    destRemaining = destLimit;
+    while ((srcRemaining != 0) && (destRemaining != 0))
+    {
+        // Read header byte
+        hdr = *srcPtr++;
+        --srcRemaining;
+        if (IS_DIFF(hdr))
+        {
+            // This is a run of differing bytes
+            count = DECODE_DIFF(hdr);
+            // Check for overrun
+            if (count > destRemaining)
+            {
+                count = destRemaining;
+            }
+            if (count > srcRemaining)
+            {
+                count = srcRemaining;
+            }
+            if (count != 0)
+            {
+                // Check if the decoded bytes lie within the specified window
+                if ((destPos + count > destStartByte) && (destPos < destStartByte + destLimit))
+                {
+                    // Calculate the offset to start copying from the source pointer
+                    uint16_t offset = destPos >= destStartByte ? 0 : destStartByte - destPos;
+                    // Calculate the number of bytes to copy, considering the offset
+                    uint16_t copyCount = count - offset;
+                    // Ensure the copyCount doesn't exceed the remaining space in the destination buffer
+                    if (copyCount > destRemaining)
+                    {
+                        copyCount = destRemaining;
+                    }
+                    // Copy the bytes from the source pointer with the offset to the destination pointer
+                    memcpy(destPtr, srcPtr + offset, copyCount);
+                    // Update the destination pointer and remaining space
+                    destPtr += copyCount;
+                    destRemaining -= copyCount;
+                }
+                // Update the source pointer, remaining source bytes, and destination position
+                srcPtr += count;
+                srcRemaining -= count;
+                destPos += count;
+            }
+        }
+        else if (IS_REPT(hdr))
+        {
+            // This is a run of repeated bytes
+            count = DECODE_REPT(hdr);
+            // Check for overrun
+            if (count > destRemaining)
+            {
+                count = destRemaining;
+            }
+            if ((count != 0) && (srcRemaining != 0))
+            {
+                // Check if the decoded bytes lie within the specified window
+                if ((destPos + count > destStartByte) && (destPos < destStartByte + destLimit))
+                {
+                    // Calculate the offset to start copying from the source pointer
+                    uint16_t offset = destPos >= destStartByte ? 0 : destStartByte - destPos;
+                    // Calculate the number of bytes to copy, considering the offset
+                    uint16_t copyCount = count - offset;
+                    // Ensure the copyCount doesn't exceed the remaining space in the destination buffer
+                    if (copyCount > destRemaining)
+                    {
+                        copyCount = destRemaining;
+                    }
+                    // Set the destination buffer with the repeated byte
+                    memset(destPtr, *srcPtr, copyCount);
+                    // Update the destination pointer and remaining space
+                    destPtr += copyCount;
+                    destRemaining -= copyCount;
+                }
+                // Update the source pointer, remaining source bytes, and destination position
+                srcPtr++;
+                srcRemaining--;
+                destPos += count;
+            }
+        }
+    }
+    return destLimit - destRemaining;   // Number of bytes actually output
 }
