@@ -284,12 +284,12 @@ uint16_t unpackbits_window(const uint8_t *srcPtr, uint8_t *destPtr, uint16_t src
             if (count != 0)
             {
                 // Check if the decoded bytes lie within the specified window
-                if (destPos + count > destStartByte && destPos < destStartByte + destLimit)
+                if ((destPos + count > destStartByte) && (destPos < destStartByte + destLimit))
                 {
                     // Calculate the offset to start copying from the source pointer
-                    uint16_t offset = destPos < destStartByte ? destStartByte - destPos : 0;
+                    uint16_t offset = destPos >= destStartByte ? 0 : destStartByte - destPos;
                     // Calculate the number of bytes to copy, considering the offset
-                    uint16_t copyCount = destPos < destStartByte ? count - offset : count;
+                    uint16_t copyCount = count - offset;
                     // Ensure the copyCount doesn't exceed the remaining space in the destination buffer
                     if (copyCount > destRemaining)
                     {
@@ -319,12 +319,12 @@ uint16_t unpackbits_window(const uint8_t *srcPtr, uint8_t *destPtr, uint16_t src
             if ((count != 0) && (srcRemaining != 0))
             {
                 // Check if the decoded bytes lie within the specified window
-                if (destPos + count > destStartByte && destPos < destStartByte + destLimit)
+                if ((destPos + count > destStartByte) && (destPos < destStartByte + destLimit))
                 {
                     // Calculate the offset to start copying from the source pointer
-                    uint16_t offset = destPos < destStartByte ? destStartByte - destPos : 0;
+                    uint16_t offset = destPos >= destStartByte ? 0 : destStartByte - destPos;
                     // Calculate the number of bytes to copy, considering the offset
-                    uint16_t copyCount = destPos < destStartByte ? count - offset : count;
+                    uint16_t copyCount = count - offset;
                     // Ensure the copyCount doesn't exceed the remaining space in the destination buffer
                     if (copyCount > destRemaining)
                     {
